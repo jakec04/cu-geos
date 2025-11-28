@@ -1,0 +1,42 @@
+---
+title: "Dashboard Title"
+format: 
+  dashboard:
+    theme: flatly
+    orientation: rows
+editor_options: 
+  chunk_output_type: console
+---
+```{r}
+#| label: setup
+#| echo: false
+
+# Load your packages here
+```
+
+# Page 1
+
+## Row
+
+### Column
+```{r}
+#| title: Chart 1
+
+# Your chart code here
+```
+
+### Column
+```{r}
+#| title: Chart 2
+
+# Your chart code here
+```
+
+# Page 2
+
+## Row
+```{r}
+#| title: Chart 3
+
+# Your chart code here
+```
