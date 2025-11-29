@@ -8,9 +8,29 @@ editor_options:
   chunk_output_type: console
 ---
 
+```{r}
+#| label: setup
+#| include: false
+
+# Load all packages once
+library(sf)
+library(leaflet)
+library(dplyr)
+library(plotly)
+library(tidycensus)
+library(htmltools)
+
+# Set Census API key
+census_api_key("8a4517f7bed332fc21d9b4f2173029e771da2eb2", overwrite = TRUE, install = FALSE)
+
+# Read geographic data once and convert GEOID to character
+cu_geo <- st_read("/Users/jakecox/rstudio/cu-geo/cu-tracts-fixed.json", quiet = TRUE)
+cu_geo$GEOID <- as.character(cu_geo$GEOID)
+```
+
 # Social Determinants of Health
 
-## Row {height="60%"}
+## Row {height="55%"}
 
 ### Column
 ```{r}
@@ -19,35 +39,24 @@ editor_options:
 #| warning: false
 #| title: "Poverty Rate by Census Tract"
 
-# Load packages
-library(sf)
-library(leaflet)
-library(dplyr)
-library(plotly)
-
-# Read the fixed GeoJSON file
-cu_geo <- st_read("/Users/jakecox/rstudio/cu-geo/cu-tracts-fixed.json", quiet = TRUE)
-
-# Read the poverty CSV file
+# Read data files
 cu_poverty <- read.csv("/Users/jakecox/rstudio/cu-geo/cu-poverty_revised.csv")
-
-# Read the SDOH CSV file
 cu_sdoh <- read.csv("/Users/jakecox/rstudio/cu-geo/cu-sdoh.csv")
 
-# Join the data by NAMELSAD
-cu_data <- cu_geo %>%
+# Join the data
+cu_data_sdoh <- cu_geo %>%
   left_join(cu_poverty, by = "NAMELSAD") %>%
   left_join(cu_sdoh, by = "NAMELSAD")
 
-# Create color palette for poverty rate
+# Create color palette
 pal_poverty <- colorNumeric(
   palette = "YlOrRd",
-  domain = cu_data$Poverty.Rate[!is.na(cu_data$Poverty.Rate)],
+  domain = cu_data_sdoh$Poverty.Rate[!is.na(cu_data_sdoh$Poverty.Rate)],
   na.color = "grey"
 )
 
 # Create leaflet map
-leaflet(cu_data) %>%
+leaflet(cu_data_sdoh) %>%
   addProviderTiles(providers$CartoDB.Positron) %>%
   addPolygons(
     fillColor = ~pal_poverty(Poverty.Rate),
@@ -60,9 +69,10 @@ leaflet(cu_data) %>%
       color = "#666",
       fillOpacity = 0.9
     ),
-    label = ~paste0("Tract: ", NAMELSAD, "<br>Poverty Rate: ", 
-                    round(Poverty.Rate, 1), "%") %>% 
-      lapply(htmltools::HTML)
+    label = ~paste0(
+      "<strong>", NAMELSAD, "</strong><br>",
+      "Poverty Rate: ", round(Poverty.Rate, 1), "%"
+    ) %>% lapply(HTML)
   ) %>%
   addLegend(
     position = "bottomright",
@@ -81,15 +91,15 @@ leaflet(cu_data) %>%
 #| warning: false
 #| title: "Median Household Income"
 
-# Create color palette for median income
+# Create color palette
 pal_income <- colorNumeric(
   palette = "Greens",
-  domain = cu_data$median_income[!is.na(cu_data$median_income)],
+  domain = cu_data_sdoh$median_income[!is.na(cu_data_sdoh$median_income)],
   na.color = "grey"
 )
 
 # Create leaflet map
-leaflet(cu_data) %>%
+leaflet(cu_data_sdoh) %>%
   addProviderTiles(providers$CartoDB.Positron) %>%
   addPolygons(
     fillColor = ~pal_income(median_income),
@@ -102,9 +112,10 @@ leaflet(cu_data) %>%
       color = "#666",
       fillOpacity = 0.9
     ),
-    label = ~paste0("Tract: ", NAMELSAD, "<br>Median Income: $", 
-                    format(median_income, big.mark = ",")) %>% 
-      lapply(htmltools::HTML)
+    label = ~paste0(
+      "<strong>", NAMELSAD, "</strong><br>",
+      "Median Income: $", format(median_income, big.mark = ",")
+    ) %>% lapply(HTML)
   ) %>%
   addLegend(
     position = "bottomright",
@@ -124,15 +135,15 @@ leaflet(cu_data) %>%
 #| warning: false
 #| title: "Health Insurance Coverage"
 
-# Create color palette for insurance coverage
+# Create color palette
 pal_insurance <- colorNumeric(
   palette = "Blues",
-  domain = cu_data$insurance_coverage[!is.na(cu_data$insurance_coverage)],
+  domain = cu_data_sdoh$insurance_coverage[!is.na(cu_data_sdoh$insurance_coverage)],
   na.color = "grey"
 )
 
 # Create leaflet map
-leaflet(cu_data) %>%
+leaflet(cu_data_sdoh) %>%
   addProviderTiles(providers$CartoDB.Positron) %>%
   addPolygons(
     fillColor = ~pal_insurance(insurance_coverage),
@@ -145,21 +156,22 @@ leaflet(cu_data) %>%
       color = "#666",
       fillOpacity = 0.9
     ),
-    label = ~paste0("Tract: ", NAMELSAD, "<br>Insurance Coverage: ", 
-                    round(insurance_coverage, 1), "%") %>% 
-      lapply(htmltools::HTML)
+    label = ~paste0(
+      "<strong>", NAMELSAD, "</strong><br>",
+      "Insurance Coverage: ", round(insurance_coverage, 1), "%"
+    ) %>% lapply(HTML)
   ) %>%
   addLegend(
     position = "bottomright",
     pal = pal_insurance,
     values = ~insurance_coverage,
-    title = "Insurance Coverage (%)",
+    title = "Coverage (%)",
     opacity = 0.7,
     na.label = "No data"
   )
 ```
 
-## Row {height="40%"}
+## Row {height="35%"}
 
 ### Column
 ```{r}
@@ -169,26 +181,17 @@ leaflet(cu_data) %>%
 #| title: "Poverty Rate Distribution"
 
 plot_ly(
-  x = ~cu_data$Poverty.Rate,
+  x = ~cu_data_sdoh$Poverty.Rate,
   type = "histogram",
   nbinsx = 15,
-  marker = list(
-    color = "#fc8d59",
-    line = list(color = "white", width = 2)
-  )
+  marker = list(color = "#fc8d59", line = list(color = "white", width = 1))
 ) %>%
   layout(
-    xaxis = list(
-      title = list(text = "Poverty Rate (%)", font = list(size = 14)),
-      gridcolor = "#f0f0f0"
-    ),
-    yaxis = list(
-      title = list(text = "Number of Census Tracts", font = list(size = 14)),
-      gridcolor = "#f0f0f0"
-    ),
+    xaxis = list(title = "Poverty Rate (%)", gridcolor = "#f0f0f0"),
+    yaxis = list(title = "Census Tracts", gridcolor = "#f0f0f0"),
     plot_bgcolor = "#fafafa",
     paper_bgcolor = "white",
-    showlegend = FALSE
+    margin = list(l = 50, r = 20, t = 30, b = 50)
   ) %>%
   config(displayModeBar = FALSE)
 ```
@@ -201,26 +204,17 @@ plot_ly(
 #| title: "Income Distribution"
 
 plot_ly(
-  x = ~cu_data$median_income,
+  x = ~cu_data_sdoh$median_income,
   type = "histogram",
   nbinsx = 15,
-  marker = list(
-    color = "#31a354",
-    line = list(color = "white", width = 2)
-  )
+  marker = list(color = "#31a354", line = list(color = "white", width = 1))
 ) %>%
   layout(
-    xaxis = list(
-      title = list(text = "Median Household Income ($)", font = list(size = 14)),
-      gridcolor = "#f0f0f0"
-    ),
-    yaxis = list(
-      title = list(text = "Number of Census Tracts", font = list(size = 14)),
-      gridcolor = "#f0f0f0"
-    ),
+    xaxis = list(title = "Median Household Income ($)", gridcolor = "#f0f0f0"),
+    yaxis = list(title = "Census Tracts", gridcolor = "#f0f0f0"),
     plot_bgcolor = "#fafafa",
     paper_bgcolor = "white",
-    showlegend = FALSE
+    margin = list(l = 50, r = 20, t = 30, b = 50)
   ) %>%
   config(displayModeBar = FALSE)
 ```
@@ -233,26 +227,810 @@ plot_ly(
 #| title: "Insurance Coverage Distribution"
 
 plot_ly(
-  x = ~cu_data$insurance_coverage,
+  x = ~cu_data_sdoh$insurance_coverage,
   type = "histogram",
   nbinsx = 15,
-  marker = list(
-    color = "#3182bd",
-    line = list(color = "white", width = 2)
+  marker = list(color = "#3182bd", line = list(color = "white", width = 1))
+) %>%
+  layout(
+    xaxis = list(title = "Insurance Coverage (%)", gridcolor = "#f0f0f0"),
+    yaxis = list(title = "Census Tracts", gridcolor = "#f0f0f0"),
+    plot_bgcolor = "#fafafa",
+    paper_bgcolor = "white",
+    margin = list(l = 50, r = 20, t = 30, b = 50)
+  ) %>%
+  config(displayModeBar = FALSE)
+```
+
+## Row {height="10%"}
+
+### Column
+```{r}
+#| echo: false
+
+div(
+  style = "padding: 10px; background-color: #f8f9fa; border-left: 4px solid #6c757d; margin: 5px; font-size: 13px;",
+  tags$p(
+    style = "margin: 0; color: #495057;",
+    tags$strong("Source: "),
+    "U.S. Census Bureau, American Community Survey 5-Year Estimates (2018-2022)."
   )
+)
+```
+
+# Economic & Access Indicators
+
+## Row {height="55%"}
+
+### Column
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| title: "Educational Attainment (Bachelor's+)"
+
+# Get educational attainment data
+education_data <- get_acs(
+  geography = "tract",
+  state = "IL",
+  county = "Champaign",
+  variables = c(
+    bachelors = "B15003_022",
+    masters = "B15003_023",
+    professional = "B15003_024",
+    doctorate = "B15003_025",
+    total_pop = "B15003_001"
+  ),
+  year = 2022,
+  survey = "acs5",
+  output = "wide"
+)
+education_data$pct_bachelor_plus <- ((education_data$bachelorsE + education_data$mastersE + 
+                                       education_data$professionalE + education_data$doctorateE) / 
+                                       education_data$total_popE) * 100
+education_data$GEOID <- as.character(education_data$GEOID)
+education_data <- education_data[, c("GEOID", "pct_bachelor_plus")]
+
+# Get unemployment data
+unemployment_data <- get_acs(
+  geography = "tract",
+  state = "IL",
+  county = "Champaign",
+  variables = c(
+    unemployed = "B23025_005",
+    labor_force = "B23025_003"
+  ),
+  year = 2022,
+  survey = "acs5",
+  output = "wide"
+)
+unemployment_data$unemployment_rate <- (unemployment_data$unemployedE / unemployment_data$labor_forceE) * 100
+unemployment_data$GEOID <- as.character(unemployment_data$GEOID)
+unemployment_data <- unemployment_data[, c("GEOID", "unemployment_rate")]
+
+# Get vehicle availability data
+vehicle_data <- get_acs(
+  geography = "tract",
+  state = "IL",
+  county = "Champaign",
+  variables = c(
+    no_vehicle = "B08201_002",
+    total_households = "B08201_001"
+  ),
+  year = 2022,
+  survey = "acs5",
+  output = "wide"
+)
+vehicle_data$pct_no_vehicle <- (vehicle_data$no_vehicleE / vehicle_data$total_householdsE) * 100
+vehicle_data$GEOID <- as.character(vehicle_data$GEOID)
+vehicle_data <- vehicle_data[, c("GEOID", "pct_no_vehicle")]
+
+# Join all data to geography
+cu_data_econ <- cu_geo %>%
+  left_join(education_data, by = "GEOID") %>%
+  left_join(unemployment_data, by = "GEOID") %>%
+  left_join(vehicle_data, by = "GEOID")
+
+# Create color palette
+pal_education <- colorNumeric(
+  palette = "Purples",
+  domain = cu_data_econ$pct_bachelor_plus[!is.na(cu_data_econ$pct_bachelor_plus)],
+  na.color = "grey"
+)
+
+# Create leaflet map
+leaflet(cu_data_econ) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  addPolygons(
+    fillColor = ~pal_education(pct_bachelor_plus),
+    weight = 1,
+    opacity = 1,
+    color = "white",
+    fillOpacity = 0.7,
+    highlightOptions = highlightOptions(
+      weight = 2,
+      color = "#666",
+      fillOpacity = 0.9
+    ),
+    label = ~paste0(
+      "<strong>", NAMELSAD, "</strong><br>",
+      "Bachelor's+: ", round(pct_bachelor_plus, 1), "%"
+    ) %>% lapply(HTML)
+  ) %>%
+  addLegend(
+    position = "bottomright",
+    pal = pal_education,
+    values = ~pct_bachelor_plus,
+    title = "Bachelor's+ (%)",
+    opacity = 0.7,
+    na.label = "No data"
+  )
+```
+
+### Column
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| title: "Unemployment Rate"
+
+# Create color palette
+pal_unemployment <- colorNumeric(
+  palette = "Oranges",
+  domain = cu_data_econ$unemployment_rate[!is.na(cu_data_econ$unemployment_rate)],
+  na.color = "grey"
+)
+
+# Create leaflet map
+leaflet(cu_data_econ) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  addPolygons(
+    fillColor = ~pal_unemployment(unemployment_rate),
+    weight = 1,
+    opacity = 1,
+    color = "white",
+    fillOpacity = 0.7,
+    highlightOptions = highlightOptions(
+      weight = 2,
+      color = "#666",
+      fillOpacity = 0.9
+    ),
+    label = ~paste0(
+      "<strong>", NAMELSAD, "</strong><br>",
+      "Unemployment: ", round(unemployment_rate, 1), "%"
+    ) %>% lapply(HTML)
+  ) %>%
+  addLegend(
+    position = "bottomright",
+    pal = pal_unemployment,
+    values = ~unemployment_rate,
+    title = "Unemployment (%)",
+    opacity = 0.7,
+    na.label = "No data"
+  )
+```
+
+### Column
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| title: "Households Without Vehicle"
+
+# Create color palette
+pal_vehicle <- colorNumeric(
+  palette = "Reds",
+  domain = cu_data_econ$pct_no_vehicle[!is.na(cu_data_econ$pct_no_vehicle)],
+  na.color = "grey"
+)
+
+# Create leaflet map
+leaflet(cu_data_econ) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  addPolygons(
+    fillColor = ~pal_vehicle(pct_no_vehicle),
+    weight = 1,
+    opacity = 1,
+    color = "white",
+    fillOpacity = 0.7,
+    highlightOptions = highlightOptions(
+      weight = 2,
+      color = "#666",
+      fillOpacity = 0.9
+    ),
+    label = ~paste0(
+      "<strong>", NAMELSAD, "</strong><br>",
+      "No Vehicle: ", round(pct_no_vehicle, 1), "%"
+    ) %>% lapply(HTML)
+  ) %>%
+  addLegend(
+    position = "bottomright",
+    pal = pal_vehicle,
+    values = ~pct_no_vehicle,
+    title = "No Vehicle (%)",
+    opacity = 0.7,
+    na.label = "No data"
+  )
+```
+
+## Row {height="35%"}
+
+### Column
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| title: "Educational Attainment Distribution"
+
+plot_ly(
+  x = ~cu_data_econ$pct_bachelor_plus,
+  type = "histogram",
+  nbinsx = 15,
+  marker = list(color = "#9e9ac8", line = list(color = "white", width = 1))
+) %>%
+  layout(
+    xaxis = list(title = "Bachelor's Degree or Higher (%)", gridcolor = "#f0f0f0"),
+    yaxis = list(title = "Census Tracts", gridcolor = "#f0f0f0"),
+    plot_bgcolor = "#fafafa",
+    paper_bgcolor = "white",
+    margin = list(l = 50, r = 20, t = 30, b = 50)
+  ) %>%
+  config(displayModeBar = FALSE)
+```
+
+### Column
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| title: "Unemployment Rate Distribution"
+
+plot_ly(
+  x = ~cu_data_econ$unemployment_rate,
+  type = "histogram",
+  nbinsx = 15,
+  marker = list(color = "#fd8d3c", line = list(color = "white", width = 1))
+) %>%
+  layout(
+    xaxis = list(title = "Unemployment Rate (%)", gridcolor = "#f0f0f0"),
+    yaxis = list(title = "Census Tracts", gridcolor = "#f0f0f0"),
+    plot_bgcolor = "#fafafa",
+    paper_bgcolor = "white",
+    margin = list(l = 50, r = 20, t = 30, b = 50)
+  ) %>%
+  config(displayModeBar = FALSE)
+```
+
+### Column
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| title: "No Vehicle Distribution"
+
+plot_ly(
+  x = ~cu_data_econ$pct_no_vehicle,
+  type = "histogram",
+  nbinsx = 15,
+  marker = list(color = "#fc4e2a", line = list(color = "white", width = 1))
+) %>%
+  layout(
+    xaxis = list(title = "Households Without Vehicle (%)", gridcolor = "#f0f0f0"),
+    yaxis = list(title = "Census Tracts", gridcolor = "#f0f0f0"),
+    plot_bgcolor = "#fafafa",
+    paper_bgcolor = "white",
+    margin = list(l = 50, r = 20, t = 30, b = 50)
+  ) %>%
+  config(displayModeBar = FALSE)
+```
+
+## Row {height="10%"}
+
+### Column
+```{r}
+#| echo: false
+
+div(
+  style = "padding: 10px; background-color: #f8f9fa; border-left: 4px solid #6c757d; margin: 5px; font-size: 13px;",
+  tags$p(
+    style = "margin: 0; color: #495057;",
+    tags$strong("Source: "),
+    "U.S. Census Bureau, American Community Survey 5-Year Estimates (2018-2022). Retrieved via tidycensus."
+  )
+)
+```
+
+# Life Expectancy
+
+## Row {height="55%"}
+
+### Column
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| title: "Life Expectancy by Census Tract (2010-2015)"
+
+# Read the mortality data
+cu_mortality <- read.csv("/Users/jakecox/rstudio/cu-geo/cu-mortality-clean.csv")
+
+# Join the data
+cu_data_life <- cu_geo %>%
+  left_join(cu_mortality, by = "NAMELSAD")
+
+# Create color palette
+pal_life_exp <- colorNumeric(
+  palette = "RdYlGn",
+  domain = cu_data_life$Life_Expectancy_2010_2015[!is.na(cu_data_life$Life_Expectancy_2010_2015)],
+  na.color = "grey"
+)
+
+# Create leaflet map
+leaflet(cu_data_life) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  addPolygons(
+    fillColor = ~pal_life_exp(Life_Expectancy_2010_2015),
+    weight = 1,
+    opacity = 1,
+    color = "white",
+    fillOpacity = 0.7,
+    highlightOptions = highlightOptions(
+      weight = 2,
+      color = "#666",
+      fillOpacity = 0.9,
+      bringToFront = TRUE
+    ),
+    label = ~paste0(
+      "<strong>", NAMELSAD, "</strong><br>",
+      "Life Expectancy: ", 
+      ifelse(is.na(Life_Expectancy_2010_2015), 
+             "Data Suppressed", 
+             paste0(round(Life_Expectancy_2010_2015, 1), " years")), "<br>",
+      "Population: ", format(Population, big.mark = ",")
+    ) %>% lapply(HTML)
+  ) %>%
+  addLegend(
+    position = "bottomright",
+    pal = pal_life_exp,
+    values = ~Life_Expectancy_2010_2015,
+    title = "Life Expectancy<br>(years)",
+    opacity = 0.7,
+    na.label = "No data"
+  )
+```
+
+## Row {height="35%"}
+
+### Column {width="50%"}
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| title: "Life Expectancy Distribution"
+
+plot_ly(
+  x = ~cu_data_life$Life_Expectancy_2010_2015,
+  type = "histogram",
+  nbinsx = 15,
+  marker = list(color = "#74c476", line = list(color = "white", width = 1))
+) %>%
+  layout(
+    xaxis = list(title = "Life Expectancy (years)", gridcolor = "#f0f0f0"),
+    yaxis = list(title = "Census Tracts", gridcolor = "#f0f0f0"),
+    plot_bgcolor = "#fafafa",
+    paper_bgcolor = "white",
+    margin = list(l = 55, r = 20, t = 30, b = 50)
+  ) %>%
+  config(displayModeBar = FALSE)
+```
+
+### Column {width="50%"}
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| title: "Life Expectancy Gap Analysis"
+
+# Calculate life expectancy categories
+cu_data_summary <- cu_data_life %>%
+  st_drop_geometry() %>%
+  filter(!is.na(Life_Expectancy_2010_2015)) %>%
+  mutate(
+    LE_Category = case_when(
+      Life_Expectancy_2010_2015 < 75 ~ "Below 75",
+      Life_Expectancy_2010_2015 >= 75 & Life_Expectancy_2010_2015 < 80 ~ "75-80",
+      Life_Expectancy_2010_2015 >= 80 & Life_Expectancy_2010_2015 < 85 ~ "80-85",
+      Life_Expectancy_2010_2015 >= 85 ~ "85+"
+    ),
+    LE_Category = factor(LE_Category, levels = c("Below 75", "75-80", "80-85", "85+"))
+  )
+
+category_counts <- cu_data_summary %>%
+  group_by(LE_Category) %>%
+  summarise(
+    Count = n(),
+    Avg_LE = mean(Life_Expectancy_2010_2015, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(LE_Category)
+
+# Calculate the gap
+le_min <- min(cu_data_life$Life_Expectancy_2010_2015, na.rm = TRUE)
+le_max <- max(cu_data_life$Life_Expectancy_2010_2015, na.rm = TRUE)
+le_gap <- round(le_max - le_min, 1)
+
+# Create bar chart
+plot_ly(
+  data = category_counts,
+  x = ~LE_Category,
+  y = ~Count,
+  type = 'bar',
+  marker = list(
+    color = c('#d7191c', '#fdae61', '#a6d96a', '#1a9641'),
+    line = list(color = 'white', width = 1)
+  ),
+  text = ~Count,
+  textposition = 'inside',
+  textfont = list(color = 'white', size = 12),
+  hoverinfo = 'text',
+  hovertext = ~paste0(Count, " tracts<br>Avg: ", round(Avg_LE, 1), " yrs")
 ) %>%
   layout(
     xaxis = list(
-      title = list(text = "Health Insurance Coverage (%)", font = list(size = 14)),
-      gridcolor = "#f0f0f0"
+      title = "Life Expectancy (years)", 
+      gridcolor = "#f0f0f0",
+      tickfont = list(size = 11)
     ),
     yaxis = list(
-      title = list(text = "Number of Census Tracts", font = list(size = 14)),
-      gridcolor = "#f0f0f0"
+      title = "Census Tracts", 
+      gridcolor = "#f0f0f0",
+      range = c(0, max(category_counts$Count) + 2)
     ),
     plot_bgcolor = "#fafafa",
     paper_bgcolor = "white",
+    margin = list(t = 45, b = 50, l = 55, r = 20),
+    annotations = list(
+      list(
+        x = 0.5,
+        y = 1.06,
+        xref = "paper",
+        yref = "paper",
+        text = paste0("<b>", le_gap, " year gap</b> between tracts"),
+        showarrow = FALSE,
+        font = list(size = 11, color = "#d7191c"),
+        xanchor = "center"
+      )
+    )
+  ) %>%
+  config(displayModeBar = FALSE)
+```
+
+## Row {height="10%"}
+
+### Column
+```{r}
+#| echo: false
+
+div(
+  style = "padding: 10px; background-color: #f8f9fa; border-left: 4px solid #6c757d; margin: 5px; font-size: 13px;",
+  tags$p(
+    style = "margin: 0; color: #495057;",
+    tags$strong("Data Note: "),
+    "Some tracts have suppressed data due to small populations. ",
+    tags$strong("Source: "),
+    "Champaign-Urbana Public Health District, 2010-2015."
+  )
+)
+```
+
+# Bivariate Analysis
+
+## Row {height="45%"}
+
+### Column
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| title: "Life Expectancy vs. Poverty Rate"
+
+# Read fresh geo data and convert GEOID immediately
+cu_geo_bv <- st_read("/Users/jakecox/rstudio/cu-geo/cu-tracts-fixed.json", quiet = TRUE)
+cu_geo_bv$GEOID <- as.character(cu_geo_bv$GEOID)
+
+# Read CSV data files
+cu_poverty_bv <- read.csv("/Users/jakecox/rstudio/cu-geo/cu-poverty_revised.csv")
+cu_sdoh_bv <- read.csv("/Users/jakecox/rstudio/cu-geo/cu-sdoh.csv")
+cu_mortality_bv <- read.csv("/Users/jakecox/rstudio/cu-geo/cu-mortality-clean.csv")
+
+# Get ACS education data
+education_bivar <- get_acs(
+  geography = "tract", state = "IL", county = "Champaign",
+  variables = c(
+    bachelors    = "B15003_022",
+    masters      = "B15003_023",
+    professional = "B15003_024",
+    doctorate    = "B15003_025",
+    total_pop    = "B15003_001"
+  ),
+  year = 2022, survey = "acs5", output = "wide"
+)
+
+# Process education data using pure base R
+education_bivar$pct_bachelor_plus <- ((education_bivar$bachelorsE + education_bivar$mastersE + 
+                                        education_bivar$professionalE + education_bivar$doctorateE) / 
+                                        education_bivar$total_popE) * 100
+education_bivar$GEOID <- as.character(education_bivar$GEOID)
+education_bivar <- data.frame(GEOID = education_bivar$GEOID, 
+                               pct_bachelor_plus = education_bivar$pct_bachelor_plus)
+
+# Create base dataset
+cu_bivar_base <- st_drop_geometry(cu_geo_bv)
+
+# Join using base R merge to avoid dplyr type issues
+cu_bivar <- merge(cu_bivar_base, cu_poverty_bv, by = "NAMELSAD", all.x = TRUE)
+cu_bivar <- merge(cu_bivar, cu_sdoh_bv, by = "NAMELSAD", all.x = TRUE)
+cu_bivar <- merge(cu_bivar, cu_mortality_bv, by = "NAMELSAD", all.x = TRUE)
+cu_bivar <- merge(cu_bivar, education_bivar, by = "GEOID", all.x = TRUE)
+cu_bivar <- cu_bivar[!is.na(cu_bivar$Life_Expectancy_2010_2015), ]
+
+# Calculate correlation
+cor_pov <- cor(cu_bivar$Life_Expectancy_2010_2015, cu_bivar$Poverty.Rate, use = "complete.obs")
+
+# Scatter plot
+plot_ly(
+  data = cu_bivar,
+  x = ~Poverty.Rate,
+  y = ~Life_Expectancy_2010_2015,
+  type = 'scatter',
+  mode = 'markers',
+  marker = list(
+    color = '#d7191c',
+    size = 10,
+    opacity = 0.7,
+    line = list(color = 'white', width = 1)
+  ),
+  text = ~paste0("<b>", NAMELSAD, "</b><br>",
+                 "Poverty: ", round(Poverty.Rate, 1), "%<br>",
+                 "Life Exp: ", round(Life_Expectancy_2010_2015, 1), " yrs"),
+  hoverinfo = 'text'
+) %>%
+  layout(
+    xaxis = list(title = "Poverty Rate (%)", gridcolor = "#f0f0f0"),
+    yaxis = list(title = "Life Expectancy (years)", gridcolor = "#f0f0f0"),
+    plot_bgcolor = "#fafafa",
+    paper_bgcolor = "white",
+    margin = list(l = 55, r = 20, t = 40, b = 50),
+    annotations = list(
+      list(
+        x = 0.98, y = 0.98,
+        xref = "paper", yref = "paper",
+        text = paste0("r = ", round(cor_pov, 2)),
+        showarrow = FALSE,
+        font = list(size = 14, color = "#d7191c"),
+        xanchor = "right"
+      )
+    )
+  ) %>%
+  config(displayModeBar = FALSE)
+```
+
+### Column
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| title: "Life Expectancy vs. Median Income"
+
+# Calculate correlation
+cor_inc <- cor(cu_bivar$Life_Expectancy_2010_2015, cu_bivar$median_income, use = "complete.obs")
+
+# Scatter plot
+plot_ly(
+  data = cu_bivar,
+  x = ~median_income,
+  y = ~Life_Expectancy_2010_2015,
+  type = 'scatter',
+  mode = 'markers',
+  marker = list(
+    color = '#1a9641',
+    size = 10,
+    opacity = 0.7,
+    line = list(color = 'white', width = 1)
+  ),
+  text = ~paste0("<b>", NAMELSAD, "</b><br>",
+                 "Income: $", format(median_income, big.mark = ","), "<br>",
+                 "Life Exp: ", round(Life_Expectancy_2010_2015, 1), " yrs"),
+  hoverinfo = 'text'
+) %>%
+  layout(
+    xaxis = list(title = "Median Household Income ($)", gridcolor = "#f0f0f0"),
+    yaxis = list(title = "Life Expectancy (years)", gridcolor = "#f0f0f0"),
+    plot_bgcolor = "#fafafa",
+    paper_bgcolor = "white",
+    margin = list(l = 55, r = 20, t = 40, b = 50),
+    annotations = list(
+      list(
+        x = 0.98, y = 0.98,
+        xref = "paper", yref = "paper",
+        text = paste0("r = ", round(cor_inc, 2)),
+        showarrow = FALSE,
+        font = list(size = 14, color = "#1a9641"),
+        xanchor = "right"
+      )
+    )
+  ) %>%
+  config(displayModeBar = FALSE)
+```
+
+### Column
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| title: "Life Expectancy vs. Education"
+
+# Calculate correlation
+cor_edu <- cor(cu_bivar$Life_Expectancy_2010_2015, cu_bivar$pct_bachelor_plus, use = "complete.obs")
+
+# Scatter plot
+plot_ly(
+  data = cu_bivar,
+  x = ~pct_bachelor_plus,
+  y = ~Life_Expectancy_2010_2015,
+  type = 'scatter',
+  mode = 'markers',
+  marker = list(
+    color = '#756bb1',
+    size = 10,
+    opacity = 0.7,
+    line = list(color = 'white', width = 1)
+  ),
+  text = ~paste0("<b>", NAMELSAD, "</b><br>",
+                 "Bachelor's+: ", round(pct_bachelor_plus, 1), "%<br>",
+                 "Life Exp: ", round(Life_Expectancy_2010_2015, 1), " yrs"),
+  hoverinfo = 'text'
+) %>%
+  layout(
+    xaxis = list(title = "Bachelor's Degree or Higher (%)", gridcolor = "#f0f0f0"),
+    yaxis = list(title = "Life Expectancy (years)", gridcolor = "#f0f0f0"),
+    plot_bgcolor = "#fafafa",
+    paper_bgcolor = "white",
+    margin = list(l = 55, r = 20, t = 40, b = 50),
+    annotations = list(
+      list(
+        x = 0.98, y = 0.98,
+        xref = "paper", yref = "paper",
+        text = paste0("r = ", round(cor_edu, 2)),
+        showarrow = FALSE,
+        font = list(size = 14, color = "#756bb1"),
+        xanchor = "right"
+      )
+    )
+  ) %>%
+  config(displayModeBar = FALSE)
+```
+
+## Row {height="45%"}
+
+### Column {width="60%"}
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| title: "Correlation Matrix"
+
+# Create correlation matrix using base R
+cor_vars <- cu_bivar[, c("Life_Expectancy_2010_2015", "Poverty.Rate", 
+                          "median_income", "insurance_coverage", "pct_bachelor_plus")]
+names(cor_vars) <- c("Life Expectancy", "Poverty Rate", "Median Income", 
+                      "Insurance Coverage", "Bachelor's+")
+
+cor_matrix <- cor(cor_vars, use = "complete.obs")
+
+# Create heatmap
+plot_ly(
+  x = colnames(cor_matrix),
+  y = rownames(cor_matrix),
+  z = cor_matrix,
+  type = "heatmap",
+  colorscale = list(
+    list(0, "#d7191c"),
+    list(0.5, "#ffffbf"),
+    list(1, "#1a9641")
+  ),
+  zmin = -1,
+  zmax = 1,
+  text = round(cor_matrix, 2),
+  texttemplate = "%{text}",
+  textfont = list(size = 12, color = "black"),
+  hoverinfo = "z",
+  colorbar = list(
+    title = list(text = "r", font = list(size = 12)),
+    tickvals = c(-1, -0.5, 0, 0.5, 1),
+    ticktext = c("-1", "-0.5", "0", "0.5", "1"),
+    len = 0.75,
+    thickness = 15
+  )
+) %>%
+  layout(
+    xaxis = list(title = "", tickangle = -45, tickfont = list(size = 11)),
+    yaxis = list(title = "", tickfont = list(size = 11), autorange = "reversed"),
+    plot_bgcolor = "white",
+    paper_bgcolor = "white",
+    margin = list(l = 100, r = 20, t = 30, b = 100)
+  ) %>%
+  config(displayModeBar = FALSE)
+```
+
+### Column {width="40%"}
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| title: "Key Correlations with Life Expectancy"
+
+# Calculate correlations with life expectancy using base R
+cor_data <- data.frame(
+  Variable = c("Median Income", "Bachelor's+", "Insurance", "Poverty Rate"),
+  Correlation = c(
+    cor(cu_bivar$Life_Expectancy_2010_2015, cu_bivar$median_income, use = "complete.obs"),
+    cor(cu_bivar$Life_Expectancy_2010_2015, cu_bivar$pct_bachelor_plus, use = "complete.obs"),
+    cor(cu_bivar$Life_Expectancy_2010_2015, cu_bivar$insurance_coverage, use = "complete.obs"),
+    cor(cu_bivar$Life_Expectancy_2010_2015, cu_bivar$Poverty.Rate, use = "complete.obs")
+  )
+)
+cor_data$Variable <- factor(cor_data$Variable, levels = cor_data$Variable[order(cor_data$Correlation)])
+cor_data$Color <- ifelse(cor_data$Correlation > 0, "#1a9641", "#d7191c")
+
+plot_ly(
+  data = cor_data,
+  x = ~Correlation,
+  y = ~Variable,
+  type = 'bar',
+  orientation = 'h',
+  marker = list(
+    color = ~Color,
+    line = list(color = 'white', width = 1)
+  ),
+  text = ~paste0(round(Correlation, 2)),
+  textposition = 'outside',
+  textfont = list(size = 12),
+  hoverinfo = 'text',
+  hovertext = ~paste0(Variable, ": r = ", round(Correlation, 2))
+) %>%
+  layout(
+    xaxis = list(
+      title = "Correlation Coefficient (r)",
+      gridcolor = "#f0f0f0",
+      range = c(-1, 1),
+      zeroline = TRUE,
+      zerolinecolor = "#666",
+      zerolinewidth = 1
+    ),
+    yaxis = list(title = "", tickfont = list(size = 11)),
+    plot_bgcolor = "#fafafa",
+    paper_bgcolor = "white",
+    margin = list(l = 100, r = 50, t = 30, b = 50),
     showlegend = FALSE
   ) %>%
   config(displayModeBar = FALSE)
+```
+
+## Row {height="10%"}
+
+### Column
+```{r}
+#| echo: false
+
+div(
+  style = "padding: 10px; background-color: #f8f9fa; border-left: 4px solid #6c757d; margin: 5px; font-size: 13px;",
+  tags$p(
+    style = "margin: 0; color: #495057;",
+    tags$strong("Note: "),
+    "Pearson correlation coefficients (r) range from -1 to 1. Values closer to ±1 indicate stronger relationships. ",
+    tags$strong("Sources: "),
+    "ACS 2018-2022; CUPHD 2010-2015."
+  )
+)
 ```
