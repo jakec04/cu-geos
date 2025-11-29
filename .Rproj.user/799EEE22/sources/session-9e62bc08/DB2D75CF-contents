@@ -21,8 +21,38 @@ editor_options:
 ### Column
 ```{r}
 #| title: Chart 1
+# Load packages
+library(sf)
+library(leaflet)
+library(dplyr)
 
-# Your chart code here
+# Read the GeoJSON file
+cu_geo <- st_read("cu_clipped.json")
+
+# Read the CSV file
+cu_poverty <- read.csv("cu-poverty.csv")
+
+# Check the column names and first few rows
+print("GeoJSON columns:")
+print(names(cu_geo))
+print(head(cu_geo$GEOID))
+
+print("CSV columns:")
+print(names(cu_poverty))
+print(head(cu_poverty$GEOID))
+
+# Convert GEOID in poverty data to character to match the geo data
+cu_poverty <- cu_poverty %>%
+  mutate(GEOID = as.character(GEOID))
+
+# Join the data
+cu_data <- cu_geo %>%
+  left_join(cu_poverty, by = "GEOID")
+
+# Check if join worked
+print("Joined data columns:")
+print(names(cu_data))
+print(summary(cu_data$poverty_rate))
 ```
 
 ### Column
