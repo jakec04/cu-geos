@@ -1,5 +1,5 @@
 ---
-title: "Dashboard Title"
+title: "Chambana Health Dashboard"
 format: 
   dashboard:
     theme: flatly
@@ -7,66 +7,252 @@ format:
 editor_options: 
   chunk_output_type: console
 ---
-```{r}
-#| label: setup
-#| echo: false
 
-# Load your packages here
-```
+# Social Determinants of Health
 
-# Page 1
-
-## Row
+## Row {height="60%"}
 
 ### Column
 ```{r}
-#| title: Chart 1
+#| echo: false
+#| message: false
+#| warning: false
+#| title: "Poverty Rate by Census Tract"
+
 # Load packages
 library(sf)
 library(leaflet)
 library(dplyr)
+library(plotly)
 
-# Read the GeoJSON file
-cu_geo <- st_read("cu_clipped.json")
+# Read the fixed GeoJSON file
+cu_geo <- st_read("/Users/jakecox/rstudio/cu-geo/cu-tracts-fixed.json", quiet = TRUE)
 
-# Read the CSV file
-cu_poverty <- read.csv("cu-poverty.csv")
+# Read the poverty CSV file
+cu_poverty <- read.csv("/Users/jakecox/rstudio/cu-geo/cu-poverty_revised.csv")
 
-# Check the column names and first few rows
-print("GeoJSON columns:")
-print(names(cu_geo))
-print(head(cu_geo$GEOID))
+# Read the SDOH CSV file
+cu_sdoh <- read.csv("/Users/jakecox/rstudio/cu-geo/cu-sdoh.csv")
 
-print("CSV columns:")
-print(names(cu_poverty))
-print(head(cu_poverty$GEOID))
-
-# Convert GEOID in poverty data to character to match the geo data
-cu_poverty <- cu_poverty %>%
-  mutate(GEOID = as.character(GEOID))
-
-# Join the data
+# Join the data by NAMELSAD
 cu_data <- cu_geo %>%
-  left_join(cu_poverty, by = "GEOID")
+  left_join(cu_poverty, by = "NAMELSAD") %>%
+  left_join(cu_sdoh, by = "NAMELSAD")
 
-# Check if join worked
-print("Joined data columns:")
-print(names(cu_data))
-print(summary(cu_data$poverty_rate))
+# Create color palette for poverty rate
+pal_poverty <- colorNumeric(
+  palette = "YlOrRd",
+  domain = cu_data$Poverty.Rate[!is.na(cu_data$Poverty.Rate)],
+  na.color = "grey"
+)
+
+# Create leaflet map
+leaflet(cu_data) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  addPolygons(
+    fillColor = ~pal_poverty(Poverty.Rate),
+    weight = 1,
+    opacity = 1,
+    color = "white",
+    fillOpacity = 0.7,
+    highlightOptions = highlightOptions(
+      weight = 2,
+      color = "#666",
+      fillOpacity = 0.9
+    ),
+    label = ~paste0("Tract: ", NAMELSAD, "<br>Poverty Rate: ", 
+                    round(Poverty.Rate, 1), "%") %>% 
+      lapply(htmltools::HTML)
+  ) %>%
+  addLegend(
+    position = "bottomright",
+    pal = pal_poverty,
+    values = ~Poverty.Rate,
+    title = "Poverty Rate (%)",
+    opacity = 0.7,
+    na.label = "No data"
+  )
 ```
 
 ### Column
 ```{r}
-#| title: Chart 2
+#| echo: false
+#| message: false
+#| warning: false
+#| title: "Median Household Income"
 
-# Your chart code here
+# Create color palette for median income
+pal_income <- colorNumeric(
+  palette = "Greens",
+  domain = cu_data$median_income[!is.na(cu_data$median_income)],
+  na.color = "grey"
+)
+
+# Create leaflet map
+leaflet(cu_data) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  addPolygons(
+    fillColor = ~pal_income(median_income),
+    weight = 1,
+    opacity = 1,
+    color = "white",
+    fillOpacity = 0.7,
+    highlightOptions = highlightOptions(
+      weight = 2,
+      color = "#666",
+      fillOpacity = 0.9
+    ),
+    label = ~paste0("Tract: ", NAMELSAD, "<br>Median Income: $", 
+                    format(median_income, big.mark = ",")) %>% 
+      lapply(htmltools::HTML)
+  ) %>%
+  addLegend(
+    position = "bottomright",
+    pal = pal_income,
+    values = ~median_income,
+    title = "Median Income ($)",
+    opacity = 0.7,
+    na.label = "No data",
+    labFormat = labelFormat(prefix = "$", big.mark = ",")
+  )
 ```
 
-# Page 2
-
-## Row
+### Column
 ```{r}
-#| title: Chart 3
+#| echo: false
+#| message: false
+#| warning: false
+#| title: "Health Insurance Coverage"
 
-# Your chart code here
+# Create color palette for insurance coverage
+pal_insurance <- colorNumeric(
+  palette = "Blues",
+  domain = cu_data$insurance_coverage[!is.na(cu_data$insurance_coverage)],
+  na.color = "grey"
+)
+
+# Create leaflet map
+leaflet(cu_data) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  addPolygons(
+    fillColor = ~pal_insurance(insurance_coverage),
+    weight = 1,
+    opacity = 1,
+    color = "white",
+    fillOpacity = 0.7,
+    highlightOptions = highlightOptions(
+      weight = 2,
+      color = "#666",
+      fillOpacity = 0.9
+    ),
+    label = ~paste0("Tract: ", NAMELSAD, "<br>Insurance Coverage: ", 
+                    round(insurance_coverage, 1), "%") %>% 
+      lapply(htmltools::HTML)
+  ) %>%
+  addLegend(
+    position = "bottomright",
+    pal = pal_insurance,
+    values = ~insurance_coverage,
+    title = "Insurance Coverage (%)",
+    opacity = 0.7,
+    na.label = "No data"
+  )
+```
+
+## Row {height="40%"}
+
+### Column
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| title: "Poverty Rate Distribution"
+
+plot_ly(
+  x = ~cu_data$Poverty.Rate,
+  type = "histogram",
+  nbinsx = 15,
+  marker = list(
+    color = "#fc8d59",
+    line = list(color = "white", width = 2)
+  )
+) %>%
+  layout(
+    xaxis = list(
+      title = list(text = "Poverty Rate (%)", font = list(size = 14)),
+      gridcolor = "#f0f0f0"
+    ),
+    yaxis = list(
+      title = list(text = "Number of Census Tracts", font = list(size = 14)),
+      gridcolor = "#f0f0f0"
+    ),
+    plot_bgcolor = "#fafafa",
+    paper_bgcolor = "white",
+    showlegend = FALSE
+  ) %>%
+  config(displayModeBar = FALSE)
+```
+
+### Column
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| title: "Income Distribution"
+
+plot_ly(
+  x = ~cu_data$median_income,
+  type = "histogram",
+  nbinsx = 15,
+  marker = list(
+    color = "#31a354",
+    line = list(color = "white", width = 2)
+  )
+) %>%
+  layout(
+    xaxis = list(
+      title = list(text = "Median Household Income ($)", font = list(size = 14)),
+      gridcolor = "#f0f0f0"
+    ),
+    yaxis = list(
+      title = list(text = "Number of Census Tracts", font = list(size = 14)),
+      gridcolor = "#f0f0f0"
+    ),
+    plot_bgcolor = "#fafafa",
+    paper_bgcolor = "white",
+    showlegend = FALSE
+  ) %>%
+  config(displayModeBar = FALSE)
+```
+
+### Column
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| title: "Insurance Coverage Distribution"
+
+plot_ly(
+  x = ~cu_data$insurance_coverage,
+  type = "histogram",
+  nbinsx = 15,
+  marker = list(
+    color = "#3182bd",
+    line = list(color = "white", width = 2)
+  )
+) %>%
+  layout(
+    xaxis = list(
+      title = list(text = "Health Insurance Coverage (%)", font = list(size = 14)),
+      gridcolor = "#f0f0f0"
+    ),
+    yaxis = list(
+      title = list(text = "Number of Census Tracts", font = list(size = 14)),
+      gridcolor = "#f0f0f0"
+    ),
+    plot_bgcolor = "#fafafa",
+    paper_bgcolor = "white",
+    showlegend = FALSE
+  ) %>%
+  config(displayModeBar = FALSE)
 ```

@@ -4,29 +4,29 @@ library(leaflet)
 library(dplyr)
 
 # Read the fixed GeoJSON file
-cu_geo <- st_read("cu-tracts-fixed.json")
+cu_geo <- st_read("/Users/jakecox/rstudio/cu-geo/cu-tracts-fixed.json")
 
-# Read the CSV file with GEOID as character
-cu_poverty <- read.csv("cu-poverty.csv", colClasses = c("GEOID" = "character"))
+# Read the CSV file
+cu_poverty <- read.csv("/Users/jakecox/rstudio/cu-geo/cu-poverty_revised.csv")
 
-# Clean the poverty rate column by removing "%" and converting to numeric
-cu_poverty <- cu_poverty %>%
-  mutate(poverty_rate = as.numeric(gsub("%", "", Percent_below_poverty_level_Estimate)))
+# Check the data
+print("CSV columns:")
+print(names(cu_poverty))
+print(head(cu_poverty))
 
-# Make sure GEOIDs are character in geo data
-cu_geo <- cu_geo %>%
-  mutate(GEOID = as.character(GEOID))
+print("GeoJSON NAMELSAD:")
+print(head(cu_geo$NAMELSAD))
 
-# Join the data
+# Join the data by NAMELSAD
 cu_data <- cu_geo %>%
-  left_join(cu_poverty, by = "GEOID")
+  left_join(cu_poverty, by = "NAMELSAD")
 
-print(paste("Rows with poverty data:", sum(!is.na(cu_data$poverty_rate))))
+print(paste("Rows with poverty data:", sum(!is.na(cu_data$Poverty.Rate))))
 
 # Create color palette for poverty rate (using only non-NA values)
 pal <- colorNumeric(
   palette = "YlOrRd",
-  domain = cu_data$poverty_rate[!is.na(cu_data$poverty_rate)],
+  domain = cu_data$Poverty.Rate[!is.na(cu_data$Poverty.Rate)],
   na.color = "grey"
 )
 
@@ -34,7 +34,7 @@ pal <- colorNumeric(
 leaflet(cu_data) %>%
   addProviderTiles(providers$CartoDB.Positron) %>%
   addPolygons(
-    fillColor = ~pal(poverty_rate),
+    fillColor = ~pal(Poverty.Rate),
     weight = 1,
     opacity = 1,
     color = "white",
@@ -44,14 +44,14 @@ leaflet(cu_data) %>%
       color = "#666",
       fillOpacity = 0.9
     ),
-    label = ~paste0("Tract: ", TRACT_NAME, "<br>Poverty Rate: ",
-                    round(poverty_rate, 1), "%") %>%
+    label = ~paste0("Tract: ", NAMELSAD, "<br>Poverty Rate: ",
+                    round(Poverty.Rate, 1), "%") %>%
       lapply(htmltools::HTML)
   ) %>%
   addLegend(
     position = "bottomright",
     pal = pal,
-    values = ~poverty_rate,
+    values = ~Poverty.Rate,
     title = "Poverty Rate (%)",
     opacity = 0.7,
     na.label = "No data"
